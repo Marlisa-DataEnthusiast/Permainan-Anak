@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Ular Tangga Seru</title>
+
+<style>
+body{font-family:Arial;background:#f4f6f8;margin:0}
+.container{max-width:1200px;margin:auto;padding:16px}
+.header{
+  background:linear-gradient(135deg,#ff9800,#ffc107);
+  padding:16px;border-radius:16px;text-align:center;
+  box-shadow:0 6px 16px rgba(0,0,0,.3)
+}
+.flex{display:flex;gap:16px;margin-top:16px}
+.card{
+  background:white;border:2px solid #ff9800;
+  border-radius:16px;padding:12px
+}
+canvas{border:4px solid #1565c0;border-radius:14px}
+
+button{
+  padding:10px;border:none;border-radius:8px;
+  font-weight:bold;cursor:pointer;width:100%;margin-top:6px
+}
+.btn-sound{background:#673ab7;color:white}
+.btn-start{background:#4caf50;color:white}
+.btn-roll{background:#2196f3;color:white}
+.btn-reset{background:#f44336;color:white}
+
+input,select{
+  width:100%;padding:6px;margin:4px 0;
+  border-radius:6px;border:1px solid #ccc
+}
+
+#dice{font-size:48px;text-align:center;margin:10px}
+.spin{animation:spin .2s linear infinite}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+#overlay,#eventOverlay{
+ position:fixed;inset:0;background:rgba(0,0,0,.55);
+ display:none;align-items:center;justify-content:center;z-index:999
+}
+.popup{
+ background:white;padding:24px;border-radius:20px;
+ text-align:center;width:320px;animation:pop .3s ease
+}
+@keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+</style>
+</head>
+
+<body>
+<div class="container">
+ <div class="header">
+  <h2>🐍🪜 ULAR TANGGA SERU 🪜🐍</h2>
+  <p>Main rame-rame, siapa duluan ke 100 🎉</p>
+ </div>
+
+ <div class="flex">
+  <!-- SETUP -->
+  <div class="card" style="width:220px">
+   <button class="btn-sound" onclick="initSound()">🔊 Aktifkan Suara</button>
+
+   <h3>Setup Pemain</h3>
+   Jumlah Pemain:
+   <select id="playerCount" onchange="updatePlayerInputs()">
+    <option value="1">1</option>
+    <option value="2" selected>2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+   </select>
+
+   <div id="playerInputs">
+    <input placeholder="Nama Pemain 1">
+    <input placeholder="Nama Pemain 2">
+    <input placeholder="Nama Pemain 3">
+    <input placeholder="Nama Pemain 4">
+    <input placeholder="Nama Pemain 5">
+   </div>
+
+   <button class="btn-start" onclick="startGame()">▶️ Mulai Game</button>
+  </div>
+
+  <!-- BOARD -->
+  <div class="card">
+   <canvas id="board" width="500" height="500"></canvas>
+  </div>
+
+  <!-- CONTROL -->
+  <div class="card" style="width:220px">
+   <div id="dice">🎲</div>
+   <button id="rollBtn" class="btn-roll" onclick="rollDice()" disabled>🎲 Lempar Dadu</button>
+   <button class="btn-reset" onclick="resetGame()">🔄 Reset</button>
+   <p id="turn" style="font-weight:bold;color:#c62828"></p>
+  </div>
+ </div>
+</div>
+
+<div id="overlay">
+ <div class="popup">
+  <h2>🎉 SELAMAT 🎉</h2>
+  <h1 id="winner"></h1>
+  <button onclick="playAgain()">Main Lagi</button>
+ </div>
+</div>
+
+<div id="eventOverlay">
+ <div class="popup" id="eventText"></div>
+</div>
+
+<script>
+// ================== AUDIO ==================
+let audioCtx=null;
+function initSound(){
+ audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ audioCtx.resume();
+ beep(600,0.15);
+ alert("Suara aktif 🔊");
+}
+function beep(f,d=.25){
+ if(!audioCtx) return;
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.frequency.value=f;o.connect(g);g.connect(audioCtx.destination);
+ o.start();
+ g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+d);
+ o.stop(audioCtx.currentTime+d);
+}
+const soundDice=()=>beep(200,.4);
+const soundUp=()=>{beep(700,.15);setTimeout(()=>beep(900,.2),150);}
+const soundDown=()=>beep(180,.4);
+const soundWin=()=>{for(let i=0;i<5;i++)setTimeout(()=>beep(800,.15),i*180);};
+
+// ================== SETUP INPUT DINAMIS ==================
+function updatePlayerInputs(){
+ const count=parseInt(document.getElementById("playerCount").value);
+ const inputs=document.querySelectorAll("#playerInputs input");
+ inputs.forEach((inp,i)=>{
+  if(i<count){
+   inp.style.display="block";
+  }else{
+   inp.style.display="none";
+   inp.value="";
+  }
+ });
+}
+
+// ================== GAME DATA ==================
+const size=50;
+const ladders={3:19,8:26,20:38,28:55,40:59,52:68,63:81,70:92};
+const snakes={17:7,32:10,48:30,62:45,75:54,88:66,97:79};
+
+const tokenStyles=[
+ {c:"#ff5252",g:"#ff8a80"},
+ {c:"#448aff",g:"#82b1ff"},
+ {c:"#69f0ae",g:"#b9f6ca"},
+ {c:"#ffd740",g:"#ffecb3"},
+ {c:"#e040fb",g:"#ea80fc"}
+];
+
+let players=[],pos=[],turn=0,finished=false;
+const ctx=document.getElementById("board").getContext("2d");
+
+// ================== BOARD LOGIC ==================
+function rowColFromNumber(n){
+ const row=Math.floor((n-1)/10);
+ let col=(n-1)%10;
+ if(row%2===1) col=9-col;
+ return {row,col};
+}
+function cell(n){
+ const {row,col}=rowColFromNumber(n);
+ return {x:col*size+size/2,y:(9-row)*size+size/2};
+}
+
+function drawBoard(){
+ ctx.clearRect(0,0,500,500);
+ ctx.font="12px Arial";
+ for(let n=1;n<=100;n++){
+  const {row,col}=rowColFromNumber(n);
+  const x=col*size,y=(9-row)*size;
+  ctx.fillStyle=((row+col)%2==0)?"#fffde7":"#fff3c4";
+  ctx.fillRect(x,y,size,size);
+  ctx.strokeStyle="#1565c0";
+  ctx.strokeRect(x,y,size,size);
+  ctx.fillStyle="#ff6f00";
+  ctx.fillText(n,x+4,y+14);
+ }
+ drawSnakesAndLadders();
+}
+
+function drawSnakesAndLadders(){
+ ctx.strokeStyle="#5d4037";ctx.lineWidth=3;
+ for(const s in ladders){
+  let a=cell(+s),b=cell(ladders[s]);
+  ctx.beginPath();
+  ctx.moveTo(a.x-6,a.y);ctx.lineTo(b.x-6,b.y);
+  ctx.moveTo(a.x+6,a.y);ctx.lineTo(b.x+6,b.y);
+  ctx.stroke();
+  for(let i=1;i<6;i++){
+   let t=i/6;
+   let x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
+   ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x+6,y);ctx.stroke();
+  }
+ }
+ ctx.strokeStyle="red";ctx.lineWidth=4;
+ for(const s in snakes){
+  let a=cell(+s),b=cell(snakes[s]);
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y);
+  ctx.bezierCurveTo(a.x+20,a.y,b.x-20,b.y,b.x,b.y);
+  ctx.stroke();
+ }
+}
+
+function drawTokens(){
+ const used={};
+ players.forEach((p,i)=>{
+  if(pos[i]==0) return;
+  const {x,y}=cell(pos[i]);
+  used[pos[i]]=(used[pos[i]]||0)+1;
+  const off=(used[pos[i]]-1)*10;
+  const s=tokenStyles[i];
+  ctx.beginPath();
+  ctx.arc(x+off,y,11,0,Math.PI*2);
+  ctx.fillStyle=s.g;ctx.globalAlpha=.6;ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.beginPath();
+  ctx.arc(x+off,y,9,0,Math.PI*2);
+  ctx.fillStyle=s.c;ctx.fill();
+  ctx.fillStyle="white";ctx.font="bold 10px Arial";
+  ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(p[0].toUpperCase(),x+off,y);
+ });
+ ctx.textAlign="start";ctx.textBaseline="alphabetic";
+}
+
+function update(){
+ drawBoard();drawTokens();
+ document.getElementById("turn").innerText=players.length?"Giliran: "+players[turn]:"";
+}
+
+// ================== GAME FLOW ==================
+function startGame(){
+ const cnt=parseInt(playerCount.value);
+ const inputs=document.querySelectorAll("#playerInputs input");
+ players=[];pos=[];turn=0;finished=false;
+ for(let i=0;i<cnt;i++){
+  players.push(inputs[i].value||("Pemain "+(i+1)));
+  pos.push(0);
+ }
+ rollBtn.disabled=false;
+ update();
+}
+
+function rollDice(){
+ if(finished) return;
+ dice.classList.add("spin");soundDice();
+ setTimeout(()=>{
+  dice.classList.remove("spin");
+  const d=Math.floor(Math.random()*6)+1;
+  dice.innerText=d;
+  let p=pos[turn]+d;
+  if(p<=100){
+   if(ladders[p]){p=ladders[p];soundUp();showEvent("🎉 Kamu naik tangga!")}
+   else if(snakes[p]){p=snakes[p];soundDown();showEvent("😭 Yah kamu turun!")}
+   pos[turn]=p;
+  }
+  if(pos[turn]==100){
+   finished=true;soundWin();
+   winner.innerText=players[turn];
+   overlay.style.display="flex";
+   return;
+  }
+  turn=(turn+1)%players.length;
+  update();
+ },700);
+}
+
+function showEvent(t){
+ eventText.innerHTML="<h2>"+t+"</h2>";
+ eventOverlay.style.display="flex";
+ setTimeout(()=>eventOverlay.style.display="none",1200);
+}
+
+function playAgain(){
+ pos=pos.map(()=>0);turn=0;finished=false;
+ overlay.style.display="none";
+ dice.innerText="🎲";
+ update();
+}
+
+function resetGame(){
+ players=[];pos=[];turn=0;finished=false;
+ rollBtn.disabled=true;
+ document.querySelectorAll("#playerInputs input").forEach(i=>i.value="");
+ dice.innerText="🎲";
+ updatePlayerInputs();
+ update();
+}
+
+// INIT
+updatePlayerInputs();
+update();
+</script>
+</body>
+</html>
+"""))

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cabutan Berhadiah</title>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f4f6f8;
+}
+
+.card{
+  width:360px;
+  margin:30px auto;
+  background:white;
+  padding:22px;
+  border-radius:22px;
+  box-shadow:0 12px 30px rgba(0,0,0,.35);
+  text-align:center;
+}
+
+.header{
+  background:linear-gradient(135deg,#ff9800,#ffc107);
+  padding:18px;
+  border-radius:18px;
+  margin-bottom:20px;
+}
+.header h2{margin:0;color:#4a2c00}
+.header p{margin:6px 0 0;color:#4a2c00}
+
+label{
+  font-weight:bold;
+  display:block;
+  margin-bottom:8px;
+}
+
+input[type=number]{
+  width:160px;
+  margin:0 auto 16px auto;
+  display:block;
+  padding:12px;
+  font-size:20px;
+  border-radius:14px;
+  border:2px solid #ff9800;
+  text-align:center;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+input[type=number]{
+  -moz-appearance:textfield;
+}
+
+button{
+  border:none;
+  border-radius:14px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.sound{
+  width:100%;
+  padding:14px;
+  background:#673ab7;
+  color:white;
+  margin-bottom:14px;
+}
+
+.row{
+  display:flex;
+  gap:12px;
+}
+
+.draw{
+  flex:1;
+  padding:16px;
+  background:#4caf50;
+  color:white;
+}
+
+.reset{
+  flex:1;
+  padding:16px;
+  background:#f44336;
+  color:white;
+}
+
+/* POPUP */
+#overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+
+#popup{
+  background:white;
+  padding:28px;
+  border-radius:22px;
+  width:300px;
+  text-align:center;
+  animation:pop .35s ease-out;
+}
+
+#popup h2{margin-top:0}
+#prize{
+  font-size:36px;
+  font-weight:900;
+  color:#d32f2f;
+  margin:16px 0;
+}
+
+@keyframes pop{
+  from{transform:scale(.6);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
+
+@keyframes shake{
+  0%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  50%{transform:translateX(6px)}
+  75%{transform:translateX(-4px)}
+  100%{transform:translateX(0)}
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <div class="header">
+    <h2>🎁 CABUTAN BERHADIAH 🎁</h2>
+    <p>Deg-degan tapi seru 😆</p>
+  </div>
+
+  <label>Pilih Nomor Cabutan 1 - 100</label>
+  <input id="num" type="number" value="1" min="1">
+
+  <button class="sound" onclick="enableSound()">🔊 Aktifkan Suara</button>
+
+  <div class="row">
+    <button class="draw" onclick="drawPrize()">🎯 CABUT</button>
+    <button class="reset" onclick="resetGame()">🔄 RESET</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="popup">
+    <h2>🎉 SELAMAT 🎉</h2>
+    <div id="prize"></div>
+    <button onclick="closePopup()">OK</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+/* ===== SOUND ENGINE ===== */
+let audioCtx = null;
+let soundUnlocked = false;
+
+function enableSound(){
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume();
+  soundUnlocked = true;
+  playTone(900,0.2);
+  alert("🔊 Suara aktif!");
+}
+
+function playTone(freq, dur=0.25){
+  if(!soundUnlocked || !audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.value = freq;
+  osc.type = "sine";
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001, audioCtx.currentTime + dur
+  );
+  osc.stop(audioCtx.currentTime + dur);
+}
+
+function drumRoll(){
+  let t=0;
+  const i=setInterval(()=>{
+    playTone(180+Math.random()*80,0.05);
+    t++;
+    if(t>12) clearInterval(i);
+  },80);
+}
+
+function playClap(){
+  playTone(600,0.15);
+  setTimeout(()=>playTone(900,0.15),150);
+  setTimeout(()=>playTone(1200,0.2),300);
+}
+
+/* ===== MC VOICE ===== */
+function mcSpeak(text){
+  if(!soundUnlocked) return;
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "id-ID";
+  msg.rate = 0.9;
+  msg.pitch = 1.2;
+  window.speechSynthesis.speak(msg);
+}
+
+/* ===== GAME LOGIC ===== */
+const prizes=[
+  "Rp 2.000","Rp 2.000","Rp 2.000",
+  "Rp 5.000","Rp 5.000",
+  "Rp 10.000","Rp 20.000",
+  "Rp 50.000","Rp 100.000"
+];
+
+function drawPrize(){
+  if(!soundUnlocked){
+    alert("Klik Aktifkan Suara dulu 😊");
+    return;
+  }
+
+  drumRoll();
+
+  setTimeout(()=>{
+    const prize = prizes[Math.floor(Math.random()*prizes.length)];
+    document.getElementById("prize").innerText = prize;
+    document.getElementById("overlay").style.display = "flex";
+
+    document.getElementById("popup").style.animation =
+      "pop .35s ease-out, shake .4s";
+
+    mcSpeak("SELAMAT!");
+
+    if(prize==="Rp 100.000"){
+      playClap();
+      confetti({particleCount:300, spread:100});
+      mcSpeak("Kamu mendapatkan seratus ribu rupiah!");
+    }
+    else if(prize==="Rp 50.000"){
+      playClap();
+      confetti({particleCount:200});
+      mcSpeak("Lima puluh ribu rupiah!");
+    }
+    else{
+      playTone(400,0.3);
+      mcSpeak("Dapat hadiah!");
+    }
+  },800);
+}
+
+function resetGame(){
+  document.getElementById("num").value = 1;
+}
+
+function closePopup(){
+  document.getElementById("overlay").style.display = "none";
+}
+</script>
+
+</body>
+</html>
+

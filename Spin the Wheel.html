@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Spin Wheel </title>
+<style>
+body{
+  font-family:Arial;
+  background:#f4f6f8;
+  text-align:center;
+}
+.container{
+  background:white;
+  width:440px;
+  margin:20px auto;
+  padding:20px;
+  border-radius:18px;
+  box-shadow:0 8px 20px rgba(0,0,0,.35);
+}
+#wheel{
+  width:320px;height:320px;
+  border-radius:50%;
+  border:10px solid #ff9800;
+  margin:20px auto;
+  transition:transform 4.5s cubic-bezier(0.17,0.67,0.12,0.99);
+}
+.pointer{
+  width:0;height:0;
+  border-left:18px solid transparent;
+  border-right:18px solid transparent;
+  border-top:28px solid red;
+  margin:0 auto -8px auto;
+}
+button{
+  padding:14px;
+  width:220px;
+  font-size:16px;
+  border-radius:10px;
+  border:none;
+  background:#4caf50;
+  color:white;
+  font-weight:bold;
+  margin:6px;
+}
+button:hover{background:#388e3c;}
+
+#overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+#popup{
+  background:white;
+  padding:30px;
+  border-radius:20px;
+  width:300px;
+  animation:pop .4s ease;
+}
+#popup h2{margin-top:0}
+#popup .prize{
+  font-size:38px;
+  font-weight:900;
+  margin:15px 0;
+}
+.zonk{color:#b71c1c}
+.win100{color:#2e7d32}
+.win50{color:#1565c0}
+
+@keyframes pop{
+  0%{transform:scale(.6);opacity:0}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes shake{
+  0%{transform:translateX(0)}
+  25%{transform:translateX(-10px)}
+  50%{transform:translateX(10px)}
+  75%{transform:translateX(-10px)}
+  100%{transform:translateX(0)}
+}
+.shake{animation:shake .45s}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>🎡 SPIN WHEEL 🎡</h2>
+  <p>Deg-degan tapi seru 😆</p>
+  <button onclick="initSound()">🔊 Aktifkan Suara</button>
+  <div class="pointer"></div>
+  <canvas id="wheel" width="320" height="320"></canvas>
+  <button onclick="spin()">SPIN</button>
+</div>
+
+<div id="overlay">
+  <div id="popup">
+    <h2>🎉 Selamat 🎉</h2>
+    <div class="prize" id="popupPrize"></div>
+    <button onclick="closePopup()">OK</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+// ================= AUDIO =================
+let audioCtx=null;
+function initSound(){
+ audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ audioCtx.resume();
+ beep(600,0.15);
+ alert("🔊 Suara aktif!");
+}
+function beep(freq,d=0.25){
+ if(!audioCtx) return;
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.type="sine"; o.frequency.value=freq;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start();
+ g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d);
+ o.stop(audioCtx.currentTime+d);
+}
+
+// MODE ANAK SOUND
+function soundSpin(){beep(220,0.4);}
+function soundZonk(){
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.type="sawtooth";
+ o.frequency.setValueAtTime(300,audioCtx.currentTime);
+ o.frequency.exponentialRampToValueAtTime(70,audioCtx.currentTime+1);
+ o.connect(g);g.connect(audioCtx.destination);
+ o.start();
+ g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+1.1);
+ o.stop(audioCtx.currentTime+1.1);
+}
+function soundHore(){
+ [600,750,900,1100].forEach((f,i)=>{
+  setTimeout(()=>beep(f,0.2),i*160);
+ });
+}
+function soundClap(){
+ for(let i=0;i<5;i++){
+  setTimeout(()=>beep(700,0.12),i*130);
+ }
+}
+function soundTetot(){
+ beep(200,0.25);
+ setTimeout(()=>beep(150,0.4),200);
+}
+
+// ================= DATA =================
+const prizes=[
+ "ZONK","Rp 2.000","Rp 5.000","ZONK","Rp 2.000",
+ "Rp 50.000","Rp 5.000","ZONK","Rp 2.000","Rp 5.000",
+ "Rp 100.000","Rp 2.000","ZONK","Rp 5.000","Rp 50.000"
+];
+
+const baseColors=["#ef5350","#ffd54f","#81c784","#64b5f6","#ce93d8"];
+const colors=prizes.map((_,i)=>baseColors[i%baseColors.length]);
+
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+const slices=prizes.length;
+const sliceAngle=2*Math.PI/slices;
+let rotation=0,spinning=false;
+
+// ================= DRAW =================
+function drawWheel(){
+ ctx.clearRect(0,0,320,320);
+ for(let i=0;i<slices;i++){
+  ctx.beginPath();
+  ctx.moveTo(160,160);
+  ctx.arc(160,160,160,i*sliceAngle,(i+1)*sliceAngle);
+  ctx.fillStyle=colors[i];
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(160,160);
+  ctx.rotate(i*sliceAngle+sliceAngle/2);
+  ctx.font=prizes[i]==="ZONK"?"bold 20px Arial":"bold 14px Arial";
+  ctx.fillStyle=prizes[i]==="ZONK"?"#b71c1c":"#000";
+  ctx.textAlign="right";
+  ctx.fillText(prizes[i],140,6);
+  ctx.restore();
+ }
+}
+drawWheel();
+
+// ================= SPIN =================
+function spin(){
+ if(spinning||!audioCtx) return;
+ spinning=true;
+ soundSpin();
+
+ const spinAngle=360*6+Math.random()*360;
+ rotation+=spinAngle;
+ canvas.style.transform=`rotate(${rotation}deg)`;
+
+ setTimeout(()=>{
+  const sliceDeg=360/slices;
+  const finalRot=rotation%360;
+  const angle=(270-finalRot+360)%360;
+  const index=Math.floor(angle/sliceDeg);
+  const prize=prizes[index];
+
+  const popup=document.getElementById("popup");
+  popup.classList.remove("shake");
+  const prizeDiv=document.getElementById("popupPrize");
+  prizeDiv.className="prize";
+  prizeDiv.innerText=prize;
+
+  if(prize==="ZONK"){
+    soundZonk();
+    popup.classList.add("shake");
+    prizeDiv.classList.add("zonk");
+  }else if(prize==="Rp 100.000"){
+    soundHore();
+    confetti({particleCount:240,spread:100});
+    prizeDiv.classList.add("win100");
+  }else if(prize==="Rp 50.000"){
+    soundClap();
+    prizeDiv.classList.add("win50");
+  }else{
+    soundTetot();
+  }
+
+  document.getElementById("overlay").style.display="flex";
+  spinning=false;
+ },4800);
+}
+
+function closePopup(){
+ document.getElementById("overlay").style.display="none";
+}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>🎮 Menu Game Anak</title>
+
+<style>
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial;
+  background:linear-gradient(135deg,#81d4fa,#ce93d8);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.container{
+  background:white;
+  padding:30px;
+  border-radius:24px;
+  width:360px;
+  box-shadow:0 15px 40px rgba(0,0,0,.3);
+  text-align:center;
+}
+
+.game-btn{
+  width:100%;
+  padding:14px;
+  margin:8px 0;
+  border:none;
+  border-radius:16px;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+
+.btn-kuis{background:#43a047;color:white}
+.btn-cabut{background:#fb8c00;color:white}
+.btn-spin{background:#8e24aa;color:white}
+.btn-ular{background:#039be5;color:white}
+
+.footer{
+  margin-top:12px;
+  font-size:12px;
+  color:#666;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h2>🎉 GAME ANAK CERDAS 🎉</h2>
+
+  <button class="game-btn btn-kuis"
+    onclick="openGame('Kuis Berhadiah.html')">
+    🧠 Kuis Anak Cerdas
+  </button>
+
+  <button class="game-btn btn-cabut"
+    onclick="openGame('Game Cabutan.html')">
+    🎁 Cabutan Berhadiah
+  </button>
+
+  <button class="game-btn btn-spin"
+    onclick="openGame('Spin the Wheel.html')">
+    🛞 Game Putar Roda
+  </button>
+
+  <button class="game-btn btn-ular"
+    onclick="openGame('Ular Tangga.html')">
+    🐍 Ular Tangga
+  </button>
+
+  <div class="footer">
+    Pilih game untuk mulai bermain 🎮
+  </div>
+</div>
+
+<script>
+function openGame(file){
+  window.location.href = file;
+}
+</script>
+
+</body>
+</html>
