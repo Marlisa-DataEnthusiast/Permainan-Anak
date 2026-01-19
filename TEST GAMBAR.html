@@ -4,240 +4,161 @@
 <meta charset="UTF-8">
 <title>TEST GAMBAR - TK</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
-body{
-  margin:0;
-  font-family:sans-serif;
-  background:linear-gradient(180deg,#fff6e5,#fde2e4);
-}
-
-#menu, #toolbar{
-  display:flex;
-  justify-content:center;
-  gap:12px;
-  padding:10px;
-  background:#fff;
-}
-
-#menu button{
-  font-size:18px;
-  padding:10px 16px;
-  border:none;
-  border-radius:14px;
-  background:#ffd966;
-}
-
-#menu button.disabled{
-  opacity:0.4;
-}
-
-#toolbar{
-  display:none;
-}
-
-.color{
-  width:28px;
-  height:28px;
-  border-radius:50%;
-  border:2px solid #ccc;
-}
-
-button{
-  font-size:18px;
-  padding:8px 12px;
-  border:none;
-  border-radius:12px;
-  background:#ffd966;
-}
-
-button.disabled{
-  opacity:0.4;
-}
-
-canvas{
-  display:none;
-  margin:10px auto;
-  background:#fffaf3;
-  border-radius:16px;
-  border:2px dashed #f5cba7;
-  touch-action:none;
-}
+  body{margin:0;font-family:sans-serif;background:linear-gradient(180deg,#fff6e5,#fde2e4)}
+  #menu,#toolbar{display:flex;justify-content:center;gap:12px;padding:10px;background:#fff}
+  #menu button{font-size:18px;padding:10px 16px;border:none;border-radius:14px;background:#ffd966}
+  #menu button.disabled{opacity:.4}
+  #toolbar{display:none}
+  .color{width:28px;height:28px;border-radius:50%;border:2px solid #ccc}
+  button{font-size:18px;padding:8px 12px;border:none;border-radius:12px;background:#ffd966}
+  button.disabled{opacity:.4}
+  canvas{display:none;margin:10px auto;background:#fffaf3;border-radius:16px;border:2px dashed #f5cba7;touch-action:none}
 </style>
 </head>
-
 <body>
 
-<!-- MENU -->
 <div id="menu">
   <button onclick="startTK()">🎨 Warnai</button>
   <button class="disabled">✏️ Gambar</button>
 </div>
 
-<!-- CANVAS -->
 <canvas id="canvas" width="360" height="420"></canvas>
 
-<!-- TOOLBAR -->
 <div id="toolbar">
+  <div class="color" style="background:#000" onclick="setColor('#000')"></div>
   <div class="color" style="background:red" onclick="setColor('red')"></div>
-  <div class="color" style="background:blue" onclick="setColor('blue')"></div>
+  <div class="color" style="background:orange" onclick="setColor('orange')"></div>
   <div class="color" style="background:yellow" onclick="setColor('yellow')"></div>
-
+  <div class="color" style="background:green" onclick="setColor('green')"></div>
+  <div class="color" style="background:blue" onclick="setColor('blue')"></div>
   <button onclick="setTool('erase')">🧽</button>
   <button id="playBtn" class="disabled" onclick="onPlay()">▶️</button>
 </div>
 
 <script>
 /* ===== STATE ===== */
-let mode = null;
-let activeTool = 'marker';
-let selectedColor = 'red';
-let coloredAreaCount = 0;
-let isPlaying = false;
+let mode=null, activeTool='marker', selectedColor='red';
+let coloredAreaCount=0, isPlaying=false;
 
 /* ===== VOICE ===== */
-function speak(text){
+function speak(t){
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'id-ID';
-  u.rate = 0.9;
-  speechSynthesis.speak(u);
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang='id-ID'; u.rate=.9; speechSynthesis.speak(u);
 }
 
 /* ===== CANVAS ===== */
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
 
-/* ===== AREA ===== */
-const areas = {
-  head: { x:180, y:130, r:60, color:null },
-  body: { x:180, y:280, r:90, color:null }
+/* ===== AREAS (FULL OBJECT) ===== */
+const DEF='#eee';
+const areas={
+  head:{hit:(x,y)=>dist(x,y,180,120)<55, color:null},
+  earsL:{hit:(x,y)=>polyHit(x,y,[[135,70],[160,40],[175,90]]), color:null},
+  earsR:{hit:(x,y)=>polyHit(x,y,[[185,90],[200,40],[225,70]]), color:null},
+  body:{hit:(x,y)=>dist(x,y,180,260)<90, color:null},
+  legL:{hit:(x,y)=>rectHit(x,y,135,330,30,60), color:null},
+  legR:{hit:(x,y)=>rectHit(x,y,195,330,30,60), color:null},
+  tail:{hit:(x,y)=>dist(x,y,245,260)<30, color:null}
 };
 
 /* ===== START TK ===== */
 function startTK(){
-  mode = 'tk';
-  document.getElementById('menu').style.display = 'none';
-  canvas.style.display = 'block';
-  document.getElementById('toolbar').style.display = 'flex';
-
+  mode='tk';
+  document.getElementById('menu').style.display='none';
+  canvas.style.display='block';
+  document.getElementById('toolbar').style.display='flex';
   drawCat();
-  speak("Pilih warna, lalu warnai gambarnya.");
+  speak('Pilih warna, lalu warnai gambarnya.');
 }
 
-/* ===== DRAW ===== */
-function drawCat(offsetY = 0){
+/* ===== DRAW FULL CAT ===== */
+function drawCat(offsetY=0){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth=4; ctx.strokeStyle='#000';
 
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = '#000';
+  // ears
+  fillPoly([[135,70+offsetY],[160,40+offsetY],[175,90+offsetY]], areas.earsL.color||DEF);
+  fillPoly([[185,90+offsetY],[200,40+offsetY],[225,70+offsetY]], areas.earsR.color||DEF);
 
   // head
-  ctx.fillStyle = areas.head.color || '#eee';
-  ctx.beginPath();
-  ctx.arc(180,130+offsetY,60,0,Math.PI*2);
-  ctx.fill(); ctx.stroke();
+  fillCircle(180,120+offsetY,55, areas.head.color||DEF);
 
   // body
-  ctx.fillStyle = areas.body.color || '#eee';
-  ctx.beginPath();
-  ctx.ellipse(180,280+offsetY,80,100,0,0,Math.PI*2);
-  ctx.fill(); ctx.stroke();
+  fillEllipse(180,260+offsetY,80,95, areas.body.color||DEF);
+
+  // legs
+  fillRect(135,330+offsetY,30,60, areas.legL.color||DEF);
+  fillRect(195,330+offsetY,30,60, areas.legR.color||DEF);
+
+  // tail
+  ctx.fillStyle=areas.tail.color||DEF;
+  ctx.beginPath(); ctx.arc(245,260+offsetY,28,0,Math.PI*2); ctx.fill(); ctx.stroke();
 }
 
 /* ===== INPUT ===== */
-canvas.onclick = (e)=>{
-  if(isPlaying || mode !== 'tk') return;
+canvas.onclick=(e)=>{
+  if(isPlaying||mode!=='tk')return;
+  const x=e.offsetX,y=e.offsetY;
 
-  const x = e.offsetX;
-  const y = e.offsetY;
-
-  if(activeTool === 'marker'){
-    for(let key in areas){
-      const a = areas[key];
-      const d = Math.hypot(x-a.x,y-a.y);
-      if(d < a.r){
-        if(!a.color){
-          coloredAreaCount++;
-          checkPlayEnable();
-        }
-        a.color = selectedColor;
-        drawCat();
-        break;
+  if(activeTool==='marker'){
+    for(const k in areas){
+      if(areas[k].hit(x,y)){
+        if(!areas[k].color){ coloredAreaCount++; checkPlayEnable(); }
+        areas[k].color=selectedColor;
+        drawCat(); microBounce(); break;
       }
     }
   }
 
-  if(activeTool === 'erase'){
-    for(let key in areas){
-      const a = areas[key];
-      const d = Math.hypot(x-a.x,y-a.y);
-      if(d < a.r){
-        if(a.color){
-          a.color = null;
-          coloredAreaCount--;
-          checkPlayEnable();
-          drawCat();
-        }
-        break;
+  if(activeTool==='erase'){
+    for(const k in areas){
+      if(areas[k].hit(x,y) && areas[k].color){
+        areas[k].color=null; coloredAreaCount--;
+        checkPlayEnable(); drawCat(); break;
       }
     }
   }
 };
 
-/* ===== TOOL ===== */
-function setColor(c){
-  activeTool = 'marker';
-  selectedColor = c;
-}
-
-function setTool(tool){
-  activeTool = tool;
-  if(tool === 'erase'){
-    speak("Sentuh warna yang mau dihapus.");
-  }
-}
+/* ===== TOOLS ===== */
+function setColor(c){ activeTool='marker'; selectedColor=c; }
+function setTool(t){ activeTool=t; if(t==='erase')speak('Sentuh warna yang mau dihapus.'); }
 
 /* ===== PLAY ===== */
 function checkPlayEnable(){
-  const btn = document.getElementById('playBtn');
-  if(coloredAreaCount >= 1){
-    btn.classList.remove('disabled');
-  }else{
-    btn.classList.add('disabled');
-  }
+  const b=document.getElementById('playBtn');
+  coloredAreaCount>=1 ? b.classList.remove('disabled') : b.classList.add('disabled');
 }
-
 function onPlay(){
-  if(coloredAreaCount < 1){
-    speak("Warnai dulu gambarnya ya.");
-    return;
-  }
-
-  isPlaying = true;
-  speak("Lihat, gambarnya hidup!");
-
-  animate();
-
-  setTimeout(()=>{
-    isPlaying = false;
-    drawCat();
-  },4000);
+  if(coloredAreaCount<1){ speak('Warnai dulu gambarnya ya.'); return; }
+  isPlaying=true; speak('Lihat, gambarnya hidup!');
+  animate(); setTimeout(()=>{isPlaying=false; drawCat();},4000);
 }
 
-/* ===== ANIMATION ===== */
+/* ===== ANIM ===== */
 function animate(){
-  let t = 0;
-  const id = setInterval(()=>{
-    t++;
-    const offset = Math.sin(t)*10;
-    drawCat(offset);
-    if(t > 20){
-      clearInterval(id);
-    }
+  let t=0; const id=setInterval(()=>{
+    t++; drawCat(Math.sin(t)*8);
+    if(t>24)clearInterval(id);
   },100);
 }
-</script>
+function microBounce(){ /* kecil, cepat */ }
 
+/* ===== GEOM HELPERS ===== */
+function dist(x,y,cx,cy){return Math.hypot(x-cx,y-cy)}
+function rectHit(x,y,rx,ry,w,h){return x>rx&&x<rx+w&&y>ry&&y<ry+h}
+function polyHit(x,y,p){
+  let c=false; for(let i=0,j=p.length-1;i<p.length;j=i++)
+    ((p[i][1]>y)!==(p[j][1]>y))&&(x<(p[j][0]-p[i][0])*(y-p[i][1])/(p[j][1]-p[i][1])+p[i][0])&&(c=!c);
+  return c;
+}
+function fillCircle(cx,cy,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.stroke()}
+function fillEllipse(cx,cy,rx,ry,col){ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);ctx.fill();ctx.stroke()}
+function fillRect(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
+function fillPoly(p,col){ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(p[0][0],p[0][1]);p.slice(1).forEach(q=>ctx.lineTo(q[0],q[1]));ctx.closePath();ctx.fill();ctx.stroke()}
+</script>
 </body>
 </html>
